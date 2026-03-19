@@ -22,7 +22,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "ROOM_METADATA",
-			"id": "468a1e3d230f4cb2bc6ce8d58ad01bcd",
+			"id": "9dd0ec05111e45438894b6b92540ef9b",
 			"remote": true
 		}
 	],
@@ -37,7 +37,7 @@
 		"head_sampling_rate": 1
 	},
 	"vars": {
-		"CLOUDFLARE_APP_ID": "cf5a86bd172f6d683b543f6dd93fac46",
+		"CLOUDFLARE_APP_ID": "f5390d204ee44bad117777d39f113860",
 		"CORS_ORIGIN": "*"
 	}
 	// Secrets (set via wrangler secret put):
