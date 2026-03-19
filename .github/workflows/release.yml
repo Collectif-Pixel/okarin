@@ -78,6 +78,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_SIGNALING_SERVER_URL: ${{ secrets.VITE_SIGNALING_SERVER_URL }}
+          VITE_AUTH_SERVER_URL: ${{ secrets.VITE_AUTH_SERVER_URL }}
+          VITE_CLOUDFLARE_APP_ID: ${{ secrets.VITE_CLOUDFLARE_APP_ID }}
         with:
           projectPath: apps/desktop
           args: --target ${{ matrix.target }}
