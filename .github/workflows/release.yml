@@ -5,13 +5,16 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +31,7 @@ jobs:
           #   target: x86_64-unknown-linux-gnu
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -36,42 +39,33 @@ jobs:
         id: version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Update version in package.json
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          # Update root package.json
+          set -euo pipefail
           jq ".version = \"$VERSION\"" package.json > tmp.json && mv tmp.json package.json
-          # Update desktop package.json
           jq ".version = \"$VERSION\"" apps/desktop/package.json > tmp.json && mv tmp.json apps/desktop/package.json
-          # Update tauri.conf.json
           jq ".version = \"$VERSION\"" apps/desktop/src-tauri/tauri.conf.json > tmp.json && mv tmp.json apps/desktop/src-tauri/tauri.conf.json
-          # Update Cargo.toml version
           sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" apps/desktop/src-tauri/Cargo.toml && rm -f apps/desktop/src-tauri/Cargo.toml.bak
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
+      - name: Setup Node.js & pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         with:
           targets: ${{ matrix.target }}
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: 'apps/desktop/src-tauri'
+          workspaces: apps/desktop/src-tauri
 
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
@@ -79,11 +73,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -93,7 +84,7 @@ jobs:
           args: --target ${{ matrix.target }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: app-${{ matrix.platform }}
           path: |
@@ -115,34 +106,39 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Get version from latest tag
         id: version
         run: |
+          set -euo pipefail
           VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
 
       - name: Prepare release files
         run: |
+          set -euo pipefail
           mkdir -p release-files
           find artifacts -type f \( -name "*.dmg" -o -name "*.app.tar.gz" -o -name "*.app.tar.gz.sig" -o -name "*.msi" -o -name "*.msi.zip" -o -name "*.msi.zip.sig" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.AppImage.tar.gz.sig" -o -name "*.deb" \) -exec cp {} release-files/ \;
           ls -la release-files/
 
       - name: Generate latest.json for updater
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: roseratugo/okarin
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          REPO="roseratugo/okarin"
+          set -euo pipefail
 
-          # Read signatures
           MACOS_SIG=""
           WINDOWS_SIG=""
           LINUX_SIG=""
@@ -184,7 +180,7 @@ jobs:
           cat release-files/latest.json
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
